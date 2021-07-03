@@ -1,7 +1,6 @@
 package errors_test
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/aacfactory/errors"
 	"testing"
@@ -9,16 +8,30 @@ import (
 
 func TestNewCodeError(t *testing.T) {
 	err := errors.NewCodeError(500, "***FOO***", "bar")
-	err.Stacktrace = append(err.Stacktrace, errors.ErrorStack{
-		Fn:   "x",
-		File: "x",
-		Line: 1,
-	})
-	err.Meta.Add("a", "a")
-	err.Meta.Put("b", nil)
 	fmt.Println(err)
-	fmt.Println(fmt.Sprintf("xxx %v", err))
-	v, _ := json.Marshal(err)
-	fmt.Println(string(v))
-	//parser.ParseDir()
+	fmt.Println(errors.ServiceError("foo"))
+	fmt.Println(errors.InvalidArgumentError("foo"))
+	fmt.Println(errors.InvalidArgumentErrorWithDetails("foo"))
+	fmt.Println(errors.UnauthorizedError("foo"))
+	fmt.Println(errors.ForbiddenError("foo"))
+	fmt.Println(errors.ForbiddenErrorWithReason("foo", "role", "bar"))
+	fmt.Println(errors.NotFoundError("foo"))
+	fmt.Println(errors.NotImplementedError("foo"))
+	fmt.Println(errors.UnavailableError("foo"))
+}
+
+func TestCodeError_ToJson(t *testing.T) {
+	fmt.Println(string(errors.ServiceError("x").ToJson()))
+}
+
+func TestFromJson(t *testing.T) {
+	err := errors.ServiceError("x")
+	v := err.ToJson()
+	fmt.Println(errors.FromJson(v))
+}
+
+func TestTransfer(t *testing.T) {
+	var err error = errors.ServiceError("x")
+	codeErr, ok := errors.Transfer(err)
+	fmt.Println(ok, codeErr.String())
 }
