@@ -7,33 +7,29 @@ import (
 )
 
 const (
-	invalidArgumentErrorFailureCodeCode = 400
-	invalidArgumentErrorCode            = "***BAD REQUEST***"
-
-	unauthorizedErrorFailureCodeCode = 401
-	unauthorizedErrorCode            = "***UNAUTHORIZED***"
-
-	forbiddenErrorFailureCodeCode = 403
-	forbiddenErrorCode            = "***FORBIDDEN***"
-
-	notFoundErrorFailureCodeCode = 404
-	notFoundErrorCode            = "***NOT FOUND***"
-
-	serviceErrorFailureCodeCode = 500
-	serviceErrorCode            = "***SERVICE EXECUTE FAILED***"
-
+	invalidArgumentErrorFailureCodeCode       = 400
+	invalidArgumentErrorCode                  = "***BAD REQUEST***"
+	unauthorizedErrorFailureCodeCode          = 401
+	unauthorizedErrorCode                     = "***UNAUTHORIZED***"
+	forbiddenErrorFailureCodeCode             = 403
+	forbiddenErrorCode                        = "***FORBIDDEN***"
+	notFoundErrorFailureCodeCode              = 404
+	notFoundErrorCode                         = "***NOT FOUND***"
+	serviceErrorFailureCodeCode               = 500
+	serviceErrorCode                          = "***SERVICE EXECUTE FAILED***"
 	serviceNotImplementedErrorFailureCodeCode = 501
 	serviceNotImplementedErrorCode            = "***SERVICE NOT IMPLEMENTED***"
-
-	unavailableErrorFailureCodeCode = 503
-	unavailableErrorCode            = "***SERVICE UNAVAILABLE***"
+	unavailableErrorFailureCodeCode           = 503
+	unavailableErrorCode                      = "***SERVICE UNAVAILABLE***"
 )
 
 type CodeError interface {
-	SetId(id string) CodeError
-	SetFailureCode(failureCode int) CodeError
-	GetMeta() MultiMap
-	GetStacktrace() (fn string, file string, line int)
+	Id() string
+	Code() string
+	FailureCode() int
+	Message() string
+	Meta() MultiMap
+	Stacktrace() (fn string, file string, line int)
 	Error() string
 	String() string
 	ToJson() []byte
@@ -46,32 +42,38 @@ type stacktrace struct {
 }
 
 type codeError struct {
-	Id          string     `json:"id,omitempty"`
-	FailureCode int        `json:"failureCode,omitempty"`
-	Code        string     `json:"code,omitempty"`
-	Message     string     `json:"message,omitempty"`
-	Meta        MultiMap   `json:"meta,omitempty"`
-	Stacktrace  stacktrace `json:"stacktrace,omitempty"`
+	Id_          string     `json:"id,omitempty"`
+	FailureCode_ int        `json:"failureCode,omitempty"`
+	Code_        string     `json:"code,omitempty"`
+	Message_     string     `json:"message,omitempty"`
+	Meta_        MultiMap   `json:"meta,omitempty"`
+	Stacktrace_  stacktrace `json:"stacktrace,omitempty"`
 }
 
-func (e *codeError) SetId(id string) CodeError {
-	e.Id = id
-	return e
+func (e *codeError) Id() string {
+	return e.Id_
 }
 
-func (e *codeError) SetFailureCode(failureCode int) CodeError {
-	e.FailureCode = failureCode
-	return e
+func (e *codeError) Code() string {
+	return e.Code_
 }
 
-func (e *codeError) GetMeta() MultiMap {
-	return e.Meta
+func (e *codeError) FailureCode() int {
+	return e.FailureCode_
 }
 
-func (e *codeError) GetStacktrace() (fn string, file string, line int) {
-	fn = e.Stacktrace.Fn
-	file = e.Stacktrace.File
-	line = e.Stacktrace.Line
+func (e *codeError) Message() string {
+	return e.Message_
+}
+
+func (e *codeError) Meta() MultiMap {
+	return e.Meta_
+}
+
+func (e *codeError) Stacktrace() (fn string, file string, line int) {
+	fn = e.Stacktrace_.Fn
+	file = e.Stacktrace_.File
+	line = e.Stacktrace_.Line
 	return
 }
 
@@ -83,15 +85,15 @@ func (e *codeError) String() string {
 	bb := bytebufferpool.Get()
 	defer bytebufferpool.Put(bb)
 	_, _ = bb.WriteString("\n")
-	if e.Id != "" {
-		_, _ = bb.WriteString(fmt.Sprintf("ID      = [%s]\n", e.Id))
+	if e.Id() != "" {
+		_, _ = bb.WriteString(fmt.Sprintf("ID      = [%s]\n", e.Id()))
 	}
-	_, _ = bb.WriteString(fmt.Sprintf("CODE    = [%d][%s]\n", e.FailureCode, e.Code))
-	_, _ = bb.WriteString(fmt.Sprintf("MESSAGE = %s\n", e.Message))
-	if !e.Meta.Empty() {
+	_, _ = bb.WriteString(fmt.Sprintf("CODE    = [%d][%s]\n", e.FailureCode(), e.Code()))
+	_, _ = bb.WriteString(fmt.Sprintf("MESSAGE = %s\n", e.Message()))
+	if !e.Meta().Empty() {
 		_, _ = bb.WriteString("META    = ")
-		for i, key := range e.Meta.Keys() {
-			values, _ := e.Meta.Values(key)
+		for i, key := range e.Meta().Keys() {
+			values, _ := e.Meta().Values(key)
 			if i == 0 {
 				_, _ = bb.WriteString(fmt.Sprintf("%s : %v\n", key, values))
 			} else {
@@ -99,7 +101,8 @@ func (e *codeError) String() string {
 			}
 		}
 	}
-	_, _ = bb.WriteString(fmt.Sprintf("STACK   = %s %s:%d\n", e.Stacktrace.Fn, e.Stacktrace.File, e.Stacktrace.Line))
+	fn, file, line := e.Stacktrace()
+	_, _ = bb.WriteString(fmt.Sprintf("STACK   = %s %s:%d\n", fn, file, line))
 
 	return string(bb.Bytes()[:bb.Len()-1])
 }
@@ -118,7 +121,7 @@ func InvalidArgumentErrorWithDetails(message string, details ...string) CodeErro
 		for i := 0; i < len(details); i = i + 2 {
 			k := details[i]
 			v := details[i+1]
-			err.GetMeta().Add(k, v)
+			err.Meta().Add(k, v)
 		}
 	}
 	return err
@@ -134,7 +137,7 @@ func ForbiddenError(message string) CodeError {
 
 func ForbiddenErrorWithReason(message string, role string, resource ...string) CodeError {
 	err := newCodeErrorWithDepth(forbiddenErrorFailureCodeCode, forbiddenErrorCode, message, 3)
-	err.GetMeta().Put(role, resource)
+	err.Meta().Put(role, resource)
 	return err
 }
 
@@ -161,11 +164,11 @@ func NewCodeError(failureCode int, code string, message string) CodeError {
 func newCodeErrorWithDepth(failureCode int, code string, message string, skip int) *codeError {
 	stacktrace := newStacktrace(skip)
 	return &codeError{
-		FailureCode: failureCode,
-		Code:        code,
-		Message:     message,
-		Meta:        MultiMap{},
-		Stacktrace:  stacktrace,
+		FailureCode_: failureCode,
+		Code_:        code,
+		Message_:     message,
+		Meta_:        MultiMap{},
+		Stacktrace_:  stacktrace,
 	}
 }
 
