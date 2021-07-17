@@ -174,6 +174,16 @@ func Transfer(err error) (codeErr CodeError, ok bool) {
 	return
 }
 
+func Map(err error) (codeErr CodeError) {
+	ok := false
+	codeErr, ok = Transfer(err)
+	if ok {
+		return
+	}
+	codeErr = ServiceError(err.Error())
+	return
+}
+
 func FromJson(v []byte) (codeErr CodeError, ok bool) {
 	codeErr = &codeError{}
 	err := jsonAPI().Unmarshal(v, codeErr)
