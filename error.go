@@ -1,7 +1,6 @@
 package errors
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/valyala/bytebufferpool"
 	"runtime"
@@ -34,8 +33,6 @@ type CodeError interface {
 	Error() string
 	String() string
 	ToJson() []byte
-	json.Marshaler
-	json.Unmarshaler
 }
 
 type stacktrace struct {
@@ -112,16 +109,6 @@ func (e *codeError) String() string {
 
 func (e *codeError) ToJson() []byte {
 	return jsonEncode(e)
-}
-
-func (e codeError) MarshalJSON() (b []byte, err error) {
-	b = jsonEncode(e)
-	return
-}
-
-func (e *codeError) UnmarshalJSON(b []byte) (err error) {
-	jsonDecode(b, e)
-	return
 }
 
 func InvalidArgumentError(message string) CodeError {
