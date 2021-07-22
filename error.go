@@ -2,6 +2,7 @@ package errors
 
 import (
 	"fmt"
+	"github.com/rs/xid"
 	"github.com/valyala/bytebufferpool"
 	"runtime"
 )
@@ -162,13 +163,14 @@ func NewCodeError(failureCode int, code string, message string) CodeError {
 }
 
 func newCodeErrorWithDepth(failureCode int, code string, message string, skip int) *codeError {
-	stacktrace := newStacktrace(skip)
+	stacktrace_ := newStacktrace(skip)
 	return &codeError{
+		Id_:          xid.New().String(),
 		FailureCode_: failureCode,
 		Code_:        code,
 		Message_:     message,
 		Meta_:        MultiMap{},
-		Stacktrace_:  stacktrace,
+		Stacktrace_:  stacktrace_,
 	}
 }
 
