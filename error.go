@@ -9,8 +9,24 @@ import (
 )
 
 const (
-	DefaultErrorCode = 500
-	DefaultErrorName = "***SERVICE ERROR***"
+	badRequestErrorCode            = 400
+	badRequestErrorName            = "***BAD REQUEST***"
+	unauthorizedErrorCode          = 401
+	unauthorizedErrorName          = "***UNAUTHORIZED***"
+	forbiddenErrorCode             = 403
+	forbiddenErrorName             = "***FORBIDDEN***"
+	notFoundErrorCode              = 404
+	notFoundErrorName              = "***NOT FOUND***"
+	notAcceptableErrorCode         = 406
+	notAcceptableErrorName         = "***NOT ACCEPTABLE***"
+	timeoutErrorCode               = 408
+	timeoutErrorName               = "***TIMEOUT***"
+	serviceErrorCode               = 500
+	serviceErrorName               = "***SERVICE EXECUTE FAILED***"
+	serviceNotImplementedErrorCode = 501
+	serviceNotImplementedErrorName = "***SERVICE NOT IMPLEMENTED***"
+	unavailableErrorCode           = 503
+	unavailableErrorName           = "***SERVICE UNAVAILABLE***"
 )
 
 type CodeError interface {
@@ -25,6 +41,42 @@ type CodeError interface {
 	Error() string
 	Format(state fmt.State, r rune)
 	String() string
+}
+
+func BadRequest(message string) CodeError {
+	return NewWithDepth(badRequestErrorCode, badRequestErrorName, message, 3)
+}
+
+func Unauthorized(message string) CodeError {
+	return NewWithDepth(unauthorizedErrorCode, unauthorizedErrorName, message, 3)
+}
+
+func Forbidden(message string) CodeError {
+	return NewWithDepth(forbiddenErrorCode, forbiddenErrorName, message, 3)
+}
+
+func NotFound(message string) CodeError {
+	return NewWithDepth(notFoundErrorCode, notFoundErrorName, message, 3)
+}
+
+func NotAcceptable(message string) CodeError {
+	return NewWithDepth(notAcceptableErrorCode, notAcceptableErrorName, message, 3)
+}
+
+func Timeout(message string) CodeError {
+	return NewWithDepth(timeoutErrorCode, timeoutErrorName, message, 3)
+}
+
+func ServiceError(message string) CodeError {
+	return NewWithDepth(serviceErrorCode, serviceErrorName, message, 3)
+}
+
+func NotImplemented(message string) CodeError {
+	return NewWithDepth(serviceNotImplementedErrorCode, serviceNotImplementedErrorName, message, 3)
+}
+
+func Unavailable(message string) CodeError {
+	return NewWithDepth(unavailableErrorCode, unavailableErrorName, message, 3)
 }
 
 func New(code int, name string, message string) CodeError {
@@ -46,7 +98,7 @@ func NewWithDepth(code int, name string, message string, skip int) CodeError {
 
 func Map(err error) (codeErr CodeError) {
 	if err == nil {
-		codeErr = NewWithDepth(DefaultErrorCode, DefaultErrorName, "can not map nil to CodeError", 3)
+		codeErr = NewWithDepth(serviceErrorCode, serviceErrorName, "can not map nil to CodeError", 3)
 		return
 	}
 	e, ok := err.(CodeError)
@@ -54,7 +106,7 @@ func Map(err error) (codeErr CodeError) {
 		codeErr = e
 		return
 	}
-	codeErr = NewWithDepth(DefaultErrorCode, DefaultErrorName, err.Error(), 3)
+	codeErr = NewWithDepth(serviceErrorCode, serviceErrorName, err.Error(), 3)
 	return
 }
 
@@ -110,7 +162,7 @@ func (e *codeError) WithCause(cause error) (err CodeError) {
 	}
 	ce, ok := cause.(CodeError)
 	if !ok {
-		ce = NewWithDepth(DefaultErrorCode, DefaultErrorName, cause.Error(), 4)
+		ce = NewWithDepth(serviceErrorCode, serviceErrorName, cause.Error(), 4)
 	}
 	if e.Cause == nil {
 		e.Cause = ce
