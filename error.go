@@ -5,35 +5,57 @@ import (
 	"github.com/rs/xid"
 	"github.com/valyala/bytebufferpool"
 	"runtime"
+	"strings"
 )
 
 const (
-	invalidArgumentErrorFailureCodeCode       = 400
-	invalidArgumentErrorCode                  = "***BAD REQUEST***"
-	unauthorizedErrorFailureCodeCode          = 401
-	unauthorizedErrorCode                     = "***UNAUTHORIZED***"
-	forbiddenErrorFailureCodeCode             = 403
-	forbiddenErrorCode                        = "***FORBIDDEN***"
-	notFoundErrorFailureCodeCode              = 404
-	notFoundErrorCode                         = "***NOT FOUND***"
-	serviceErrorFailureCodeCode               = 500
-	serviceErrorCode                          = "***SERVICE EXECUTE FAILED***"
-	serviceNotImplementedErrorFailureCodeCode = 501
-	serviceNotImplementedErrorCode            = "***SERVICE NOT IMPLEMENTED***"
-	unavailableErrorFailureCodeCode           = 503
-	unavailableErrorCode                      = "***SERVICE UNAVAILABLE***"
+	DefaultErrorCode = 500
+	DefaultErrorName = "***SERVICE ERROR***"
 )
 
 type CodeError interface {
 	Id() string
-	Code() string
-	FailureCode() int
+	Code() int
+	Name() string
 	Message() string
-	Meta() MultiMap
 	Stacktrace() (fn string, file string, line int)
+	WithMeta(key string, value string) (err CodeError)
+	WithCause(cause error) (err CodeError)
+	Contains(err error) (has bool)
 	Error() string
+	Format(state fmt.State, r rune)
 	String() string
-	ToJson() []byte
+}
+
+func New(code int, name string, message string) CodeError {
+	return NewWithDepth(code, name, message, 3)
+}
+
+func NewWithDepth(code int, name string, message string, skip int) CodeError {
+	stacktrace_ := newStacktrace(skip)
+	return &codeError{
+		Id_:         xid.New().String(),
+		Code_:       code,
+		Name_:       name,
+		Message_:    message,
+		Meta_:       make(map[string]string),
+		Stacktrace_: stacktrace_,
+		Cause:       nil,
+	}
+}
+
+func Map(err error) (codeErr CodeError) {
+	if err == nil {
+		codeErr = NewWithDepth(DefaultErrorCode, DefaultErrorName, "can not map nil to CodeError", 3)
+		return
+	}
+	e, ok := err.(CodeError)
+	if ok {
+		codeErr = e
+		return
+	}
+	codeErr = NewWithDepth(DefaultErrorCode, DefaultErrorName, err.Error(), 3)
+	return
 }
 
 type stacktrace struct {
@@ -43,32 +65,29 @@ type stacktrace struct {
 }
 
 type codeError struct {
-	Id_          string     `json:"id,omitempty"`
-	FailureCode_ int        `json:"failureCode,omitempty"`
-	Code_        string     `json:"code,omitempty"`
-	Message_     string     `json:"message,omitempty"`
-	Meta_        MultiMap   `json:"meta,omitempty"`
-	Stacktrace_  stacktrace `json:"stacktrace,omitempty"`
+	Id_         string            `json:"id,omitempty"`
+	Code_       int               `json:"code,omitempty"`
+	Name_       string            `json:"name,omitempty"`
+	Message_    string            `json:"message,omitempty"`
+	Meta_       map[string]string `json:"meta,omitempty"`
+	Stacktrace_ stacktrace        `json:"stacktrace,omitempty"`
+	Cause       CodeError         `json:"cause,omitempty"`
 }
 
 func (e *codeError) Id() string {
 	return e.Id_
 }
 
-func (e *codeError) Code() string {
+func (e *codeError) Code() int {
 	return e.Code_
 }
 
-func (e *codeError) FailureCode() int {
-	return e.FailureCode_
+func (e *codeError) Name() string {
+	return e.Name_
 }
 
 func (e *codeError) Message() string {
 	return e.Message_
-}
-
-func (e *codeError) Meta() MultiMap {
-	return e.Meta_
 }
 
 func (e *codeError) Stacktrace() (fn string, file string, line int) {
@@ -78,127 +97,108 @@ func (e *codeError) Stacktrace() (fn string, file string, line int) {
 	return
 }
 
+func (e *codeError) WithMeta(key string, value string) (err CodeError) {
+	e.Meta_[key] = value
+	err = e
+	return
+}
+
+func (e *codeError) WithCause(cause error) (err CodeError) {
+	if cause == nil {
+		err = e
+		return
+	}
+	ce, ok := cause.(CodeError)
+	if !ok {
+		ce = NewWithDepth(DefaultErrorCode, DefaultErrorName, cause.Error(), 4)
+	}
+	if e.Cause == nil {
+		e.Cause = ce
+	} else {
+		_ = e.Cause.WithCause(ce)
+	}
+	err = e
+	return
+}
+
+func (e *codeError) Contains(err error) (has bool) {
+	if err == nil {
+		return
+	}
+	if e.Message() == err.Error() {
+		has = true
+		return
+	}
+	if e.Cause != nil {
+		has = e.Cause.Contains(err)
+		return
+	}
+	return
+}
+
 func (e *codeError) Error() string {
 	return e.String()
 }
 
 func (e *codeError) String() string {
-	bb := bytebufferpool.Get()
-	defer bytebufferpool.Put(bb)
-	_, _ = bb.WriteString("\n")
-	if e.Id() != "" {
-		_, _ = bb.WriteString(fmt.Sprintf("ID      = [%s]\n", e.Id()))
-	}
-	_, _ = bb.WriteString(fmt.Sprintf("CODE    = [%d][%s]\n", e.FailureCode(), e.Code()))
-	_, _ = bb.WriteString(fmt.Sprintf("MESSAGE = %s\n", e.Message()))
-	if !e.Meta().Empty() {
-		_, _ = bb.WriteString("META    = ")
-		for i, key := range e.Meta().Keys() {
-			values, _ := e.Meta().Values(key)
-			if i == 0 {
-				_, _ = bb.WriteString(fmt.Sprintf("%s : %v\n", key, values))
-			} else {
-				_, _ = bb.WriteString(fmt.Sprintf("          %s : %v\n", key, values))
+	return fmt.Sprintf("%v", e)
+}
+
+func (e *codeError) Format(state fmt.State, verb rune) {
+	switch verb {
+	case 'v':
+		switch {
+		case state.Flag('+'):
+			buf := bytebufferpool.Get()
+			_, _ = buf.WriteString(">>>>>>>>>>>>>\n")
+			if e.Id() != "" {
+				_, _ = buf.WriteString(fmt.Sprintf("ID      = [%s]\n", e.Id()))
 			}
+			_, _ = buf.WriteString(fmt.Sprintf("CN      = [%d][%s]\n", e.Code(), e.Name()))
+			_, _ = buf.WriteString(fmt.Sprintf("MESSAGE = %s\n", e.Message()))
+			if len(e.Meta_) > 0 {
+				_, _ = buf.WriteString("META    = ")
+				metaIdx := 0
+				for k, v := range e.Meta_ {
+					if metaIdx == 0 {
+						_, _ = buf.WriteString(fmt.Sprintf("%s : %v\n", k, v))
+					} else {
+						_, _ = buf.WriteString(fmt.Sprintf("          %s : %v\n", k, v))
+					}
+					metaIdx++
+				}
+			}
+			fn, file, line := e.Stacktrace()
+			_, _ = buf.WriteString(fmt.Sprintf("STACK   = %s %s:%d\n", fn, file, line))
+			formatCause(buf, e.Cause, 0)
+			_, _ = buf.WriteString("<<<<<<<<<<<<<\n")
+			content := buf.Bytes()[:buf.Len()-1]
+			bytebufferpool.Put(buf)
+			_, _ = fmt.Fprintf(state, "%s", content)
+		default:
+			_, _ = fmt.Fprintf(state, "%s", e.Message())
 		}
-	}
-	fn, file, line := e.Stacktrace()
-	_, _ = bb.WriteString(fmt.Sprintf("STACK   = %s %s:%d\n", fn, file, line))
-
-	return string(bb.Bytes()[:bb.Len()-1])
-}
-
-func (e *codeError) ToJson() []byte {
-	return jsonEncode(e)
-}
-
-func InvalidArgumentError(message string) CodeError {
-	return newCodeErrorWithDepth(invalidArgumentErrorFailureCodeCode, invalidArgumentErrorCode, message, 3)
-}
-
-func InvalidArgumentErrorWithDetails(message string, details ...string) CodeError {
-	err := newCodeErrorWithDepth(invalidArgumentErrorFailureCodeCode, invalidArgumentErrorCode, message, 3)
-	if details != nil && len(details) != 0 && len(details)%2 == 0 {
-		for i := 0; i < len(details); i = i + 2 {
-			k := details[i]
-			v := details[i+1]
-			err.Meta().Add(k, v)
-		}
-	}
-	return err
-}
-
-func UnauthorizedError(message string) CodeError {
-	return newCodeErrorWithDepth(unauthorizedErrorFailureCodeCode, unauthorizedErrorCode, message, 3)
-}
-
-func ForbiddenError(message string) CodeError {
-	return newCodeErrorWithDepth(forbiddenErrorFailureCodeCode, forbiddenErrorCode, message, 3)
-}
-
-func ForbiddenErrorWithReason(message string, role string, resource ...string) CodeError {
-	err := newCodeErrorWithDepth(forbiddenErrorFailureCodeCode, forbiddenErrorCode, message, 3)
-	err.Meta().Put(role, resource)
-	return err
-}
-
-func NotFoundError(message string) CodeError {
-	return newCodeErrorWithDepth(notFoundErrorFailureCodeCode, notFoundErrorCode, message, 3)
-}
-
-func ServiceError(message string) CodeError {
-	return newCodeErrorWithDepth(serviceErrorFailureCodeCode, serviceErrorCode, message, 3)
-}
-
-func NotImplementedError(message string) CodeError {
-	return newCodeErrorWithDepth(serviceNotImplementedErrorFailureCodeCode, serviceNotImplementedErrorCode, message, 3)
-}
-
-func UnavailableError(message string) CodeError {
-	return newCodeErrorWithDepth(unavailableErrorFailureCodeCode, unavailableErrorCode, message, 3)
-}
-
-func NewCodeError(failureCode int, code string, message string) CodeError {
-	return newCodeErrorWithDepth(failureCode, code, message, 3)
-}
-
-func newCodeErrorWithDepth(failureCode int, code string, message string, skip int) *codeError {
-	stacktrace_ := newStacktrace(skip)
-	return &codeError{
-		Id_:          xid.New().String(),
-		FailureCode_: failureCode,
-		Code_:        code,
-		Message_:     message,
-		Meta_:        MultiMap{},
-		Stacktrace_:  stacktrace_,
+	default:
+		_, _ = fmt.Fprintf(state, "%s", e.Message())
 	}
 }
 
-func Transfer(err error) (codeErr CodeError, ok bool) {
-	codeErr, ok = err.(CodeError)
-	return
-}
-
-func Map(err error) (codeErr CodeError) {
-	ok := false
-	codeErr, ok = Transfer(err)
-	if ok {
+func formatCause(buf *bytebufferpool.ByteBuffer, cause CodeError, depth int) {
+	if cause == nil {
 		return
 	}
-	codeErr = ServiceError(err.Error())
-	return
-}
-
-func FromJson(v []byte) (codeErr CodeError, ok bool) {
-	codeErr = &codeError{}
-	err := jsonAPI().Unmarshal(v, codeErr)
-	if err != nil {
-		codeErr = nil
-		ok = false
+	if depth == 0 {
+		_, _ = buf.WriteString(fmt.Sprintf("CAUSE   = %s\n", cause.Message()))
+	} else {
+		_, _ = buf.WriteString(fmt.Sprintf("        = %s\n", cause.Message()))
+	}
+	e, ok := cause.(*codeError)
+	if !ok {
 		return
 	}
-	ok = true
-	return
+	if e.Cause != nil {
+		formatCause(buf, e.Cause, depth+1)
+	}
 }
 
 func newStacktrace(skip int) stacktrace {
@@ -210,10 +210,16 @@ func newStacktrace(skip int) stacktrace {
 			Line: 0,
 		}
 	}
+	if strings.IndexByte(file, '/') == 0 || strings.IndexByte(file, ':') == 1 {
+		idx := strings.Index(file, "/src/")
+		if idx > 0 {
+			file = file[idx+5:]
+		}
+	}
 	fn := runtime.FuncForPC(pc)
 	return stacktrace{
 		Fn:   fn.Name(),
-		File: fileNameSubGoPath(file),
+		File: file,
 		Line: line,
 	}
 }

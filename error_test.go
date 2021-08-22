@@ -1,37 +1,48 @@
 package errors_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/aacfactory/errors"
 	"testing"
+	"time"
 )
 
-func TestNewCodeError(t *testing.T) {
-	err := errors.NewCodeError(500, "***FOO***", "bar")
-	fmt.Println(err)
-	fmt.Println(errors.ServiceError("foo"))
-	fmt.Println(errors.InvalidArgumentError("foo"))
-	fmt.Println(errors.InvalidArgumentErrorWithDetails("foo"))
-	fmt.Println(errors.UnauthorizedError("foo"))
-	fmt.Println(errors.ForbiddenError("foo"))
-	fmt.Println(errors.ForbiddenErrorWithReason("foo", "role", "bar"))
-	fmt.Println(errors.NotFoundError("foo"))
-	fmt.Println(errors.NotImplementedError("foo"))
-	fmt.Println(errors.UnavailableError("foo"))
+func TestNew(t *testing.T) {
+	err := errors.New(500, errors.DefaultErrorName, "foo")
+	fmt.Printf("%v\n", err)
+	fmt.Printf("%+v\n", err)
 }
 
-func TestCodeError_ToJson(t *testing.T) {
-	fmt.Println(string(errors.ServiceError("x").ToJson()))
+func TestMap(t *testing.T) {
+	cause := fmt.Errorf("foo")
+	err := errors.Map(cause)
+	fmt.Printf("%v\n", err)
+	fmt.Printf("%+v\n", err)
 }
 
-func TestFromJson(t *testing.T) {
-	err := errors.ServiceError("x")
-	v := err.ToJson()
-	fmt.Println(errors.FromJson(v))
+func TestCodeError_WithCause(t *testing.T) {
+	err := errors.New(500, errors.DefaultErrorName, "foo")
+	err = err.WithCause(fmt.Errorf("bar")).WithCause(fmt.Errorf("baz"))
+	fmt.Printf("%v\n", err)
+	fmt.Printf("%+v\n", err)
+	fmt.Println("contains foo", err.Contains(fmt.Errorf("foo")))
+	fmt.Println("contains bar", err.Contains(fmt.Errorf("bar")))
+	fmt.Println("contains baz", err.Contains(fmt.Errorf("baz")))
+	fmt.Println("contains x  ", err.Contains(fmt.Errorf("x")))
 }
 
-func TestTransfer(t *testing.T) {
-	var err error = errors.ServiceError("x")
-	codeErr, ok := errors.Transfer(err)
-	fmt.Println(ok, codeErr.String())
+func TestCodeError_WithMeta(t *testing.T) {
+	err := errors.New(500, errors.DefaultErrorName, "foo")
+	err = err.WithMeta("a", time.Now().String()).WithMeta("b", "b")
+	fmt.Printf("%v\n", err)
+	fmt.Printf("%+v\n", err)
+}
+
+func Test_Json(t *testing.T) {
+	err := errors.New(500, errors.DefaultErrorName, "foo")
+	err = err.WithMeta("a", time.Now().String()).WithMeta("b", "b")
+	err = err.WithCause(fmt.Errorf("bar")).WithCause(fmt.Errorf("baz"))
+	data, _ := json.Marshal(err)
+	fmt.Println(string(data))
 }
