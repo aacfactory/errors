@@ -247,7 +247,7 @@ func (e *codeError) UnmarshalJSON(p []byte) (err error) {
 			e.Cause_ = cause
 		}
 	}
-	
+
 	return
 }
 
