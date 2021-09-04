@@ -3,6 +3,7 @@ package errors
 import (
 	"fmt"
 	"github.com/rs/xid"
+	"github.com/tidwall/gjson"
 	"github.com/valyala/bytebufferpool"
 	"runtime"
 	"strings"
@@ -27,6 +28,8 @@ const (
 	serviceNotImplementedErrorName = "***SERVICE NOT IMPLEMENTED***"
 	unavailableErrorCode           = 503
 	unavailableErrorName           = "***SERVICE UNAVAILABLE***"
+	warnErrorCode                  = 555
+	warnErrorName                  = "***WARNING***"
 )
 
 type CodeError interface {
@@ -41,6 +44,10 @@ type CodeError interface {
 	Error() string
 	Format(state fmt.State, r rune)
 	String() string
+}
+
+func Empty() CodeError {
+	return &codeError{}
 }
 
 func BadRequest(message string) CodeError {
@@ -79,6 +86,10 @@ func Unavailable(message string) CodeError {
 	return NewWithDepth(unavailableErrorCode, unavailableErrorName, message, 3)
 }
 
+func Warning(message string) CodeError {
+	return NewWithDepth(warnErrorCode, warnErrorName, message, 3)
+}
+
 func New(code int, name string, message string) CodeError {
 	return NewWithDepth(code, name, message, 3)
 }
@@ -92,7 +103,7 @@ func NewWithDepth(code int, name string, message string, skip int) CodeError {
 		Message_:    message,
 		Meta_:       make(map[string]string),
 		Stacktrace_: stacktrace_,
-		Cause:       nil,
+		Cause_:      nil,
 	}
 }
 
@@ -123,7 +134,7 @@ type codeError struct {
 	Message_    string            `json:"message,omitempty"`
 	Meta_       map[string]string `json:"meta,omitempty"`
 	Stacktrace_ stacktrace        `json:"stacktrace,omitempty"`
-	Cause       CodeError         `json:"cause,omitempty"`
+	Cause_      CodeError         `json:"cause,omitempty"`
 }
 
 func (e *codeError) Id() string {
@@ -164,10 +175,10 @@ func (e *codeError) WithCause(cause error) (err CodeError) {
 	if !ok {
 		ce = NewWithDepth(serviceErrorCode, serviceErrorName, cause.Error(), 4)
 	}
-	if e.Cause == nil {
-		e.Cause = ce
+	if e.Cause_ == nil {
+		e.Cause_ = ce
 	} else {
-		_ = e.Cause.WithCause(ce)
+		_ = e.Cause_.WithCause(ce)
 	}
 	err = e
 	return
@@ -181,8 +192,8 @@ func (e *codeError) Contains(err error) (has bool) {
 		has = true
 		return
 	}
-	if e.Cause != nil {
-		has = e.Cause.Contains(err)
+	if e.Cause_ != nil {
+		has = e.Cause_.Contains(err)
 		return
 	}
 	return
@@ -194,6 +205,50 @@ func (e *codeError) Error() string {
 
 func (e *codeError) String() string {
 	return fmt.Sprintf("%v", e)
+}
+
+func (e *codeError) UnmarshalJSON(p []byte) (err error) {
+	if p == nil || len(p) == 0 {
+		return
+	}
+	r := gjson.ParseBytes(p)
+	if !r.Exists() {
+		return
+	}
+
+	e.Id_ = r.Get("id").String()
+	e.Code_ = int(r.Get("code").Int())
+	e.Name_ = r.Get("name").String()
+	e.Message_ = r.Get("message").String()
+	meta0 := r.Get("meta")
+	if meta0.Exists() {
+		if e.Meta_ == nil {
+			e.Meta_ = make(map[string]string)
+		}
+		metaValue0 := meta0.Map()
+		for key, result := range metaValue0 {
+			if result.Exists() {
+				e.Meta_[key] = result.String()
+			}
+		}
+	}
+	st0 := r.Get("stacktrace")
+	if st0.Exists() && st0.IsObject() {
+		e.Stacktrace_.File = st0.Get("file").String()
+		e.Stacktrace_.Line = int(st0.Get("line").Int())
+		e.Stacktrace_.Fn = st0.Get("fn").String()
+	}
+
+	cause0 := r.Get("cause")
+	if cause0.Exists() && cause0.IsObject() {
+		cause := &codeError{}
+		causeErr := cause.UnmarshalJSON([]byte(cause0.Raw))
+		if causeErr == nil {
+			e.Cause_ = cause
+		}
+	}
+	
+	return
 }
 
 func (e *codeError) Format(state fmt.State, verb rune) {
@@ -222,7 +277,7 @@ func (e *codeError) Format(state fmt.State, verb rune) {
 			}
 			fn, file, line := e.Stacktrace()
 			_, _ = buf.WriteString(fmt.Sprintf("STACK   = %s %s:%d\n", fn, file, line))
-			formatCause(buf, e.Cause, 0)
+			formatCause(buf, e.Cause_, 0)
 			_, _ = buf.WriteString("<<<<<<<<<<<<<\n")
 			content := buf.Bytes()[:buf.Len()-1]
 			bytebufferpool.Put(buf)
@@ -248,8 +303,8 @@ func formatCause(buf *bytebufferpool.ByteBuffer, cause CodeError, depth int) {
 	if !ok {
 		return
 	}
-	if e.Cause != nil {
-		formatCause(buf, e.Cause, depth+1)
+	if e.Cause_ != nil {
+		formatCause(buf, e.Cause_, depth+1)
 	}
 }
 
