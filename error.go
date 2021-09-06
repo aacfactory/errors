@@ -24,6 +24,7 @@ const (
 	timeoutErrorName               = "***TIMEOUT***"
 	serviceErrorCode               = 500
 	serviceErrorName               = "***SERVICE EXECUTE FAILED***"
+	nilErrorMessage                = "NIL"
 	serviceNotImplementedErrorCode = 501
 	serviceNotImplementedErrorName = "***SERVICE NOT IMPLEMENTED***"
 	unavailableErrorCode           = 503
@@ -76,6 +77,10 @@ func Timeout(message string) CodeError {
 
 func ServiceError(message string) CodeError {
 	return NewWithDepth(serviceErrorCode, serviceErrorName, message, 3)
+}
+
+func NilError() CodeError {
+	return NewWithDepth(badRequestErrorCode, badRequestErrorName, nilErrorMessage, 3)
 }
 
 func NotImplemented(message string) CodeError {
