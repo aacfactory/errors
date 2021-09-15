@@ -326,6 +326,11 @@ func newStacktrace(skip int) stacktrace {
 		idx := strings.Index(file, "/src/")
 		if idx > 0 {
 			file = file[idx+5:]
+		} else {
+			idx = strings.Index(file, "/pkg/mod/")
+			if idx > 0 {
+				file = file[idx+9:]
+			}
 		}
 	}
 	fn := runtime.FuncForPC(pc)
