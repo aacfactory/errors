@@ -262,7 +262,7 @@ func (e *codeError) Format(state fmt.State, verb rune) {
 		switch {
 		case state.Flag('+'):
 			buf := bytebufferpool.Get()
-			_, _ = buf.WriteString(">>>>>>>>>>>>>\n")
+			_, _ = buf.WriteString("\n>>>>>>>>>>>>>\n")
 			if e.Id() != "" {
 				_, _ = buf.WriteString(fmt.Sprintf("ID      = [%s]\n", e.Id()))
 			}
@@ -283,7 +283,7 @@ func (e *codeError) Format(state fmt.State, verb rune) {
 			fn, file, line := e.Stacktrace()
 			_, _ = buf.WriteString(fmt.Sprintf("STACK   = %s %s:%d\n", fn, file, line))
 			formatCause(buf, e.Cause_, 0)
-			_, _ = buf.WriteString("<<<<<<<<<<<<<\n")
+			_, _ = buf.WriteString("<<<<<<<<<<<<<\n\n")
 			content := buf.Bytes()[:buf.Len()-1]
 			bytebufferpool.Put(buf)
 			_, _ = fmt.Fprintf(state, "%s", content)
