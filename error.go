@@ -80,7 +80,7 @@ func ServiceError(message string) CodeError {
 }
 
 func NilError() CodeError {
-	return NewWithDepth(badRequestErrorCode, badRequestErrorName, nilErrorMessage, 3)
+	return NewWithDepth(notFoundErrorCode, notFoundErrorName, nilErrorMessage, 3)
 }
 
 func NotImplemented(message string) CodeError {
