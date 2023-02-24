@@ -340,3 +340,27 @@ func newStacktrace(skip int) stacktrace {
 		Line: line,
 	}
 }
+
+func MakeErrors() Errors {
+	return make([]CodeError, 0, 1)
+}
+
+type Errors []CodeError
+
+func (e *Errors) Append(err error) {
+	*e = append(*e, Map(err))
+}
+
+func (e *Errors) Error() (err error) {
+	if len(*e) == 0 {
+		return
+	}
+	e0 := (*e)[0]
+	if len(*e) > 1 {
+		for i := 1; i < len(*e); i++ {
+			e0 = e0.WithCause((*e)[i])
+		}
+	}
+	err = e0
+	return
+}

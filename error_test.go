@@ -46,3 +46,11 @@ func Test_Json(t *testing.T) {
 	data, _ := json.Marshal(err)
 	fmt.Println(string(data))
 }
+
+func TestMakeErrors(t *testing.T) {
+	errs := errors.MakeErrors()
+	for i := 0; i < 3; i++ {
+		errs.Append(errors.ServiceError(fmt.Sprintf("%d", i)))
+	}
+	fmt.Println(fmt.Sprintf("%+v", errs.Error()))
+}
