@@ -209,7 +209,7 @@ func (e *codeError) Error() string {
 }
 
 func (e *codeError) String() string {
-	return fmt.Sprintf("%v", e)
+	return fmt.Sprintf("%+v", e)
 }
 
 func (e *codeError) UnmarshalJSON(p []byte) (err error) {
