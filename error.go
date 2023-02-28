@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/rs/xid"
 	"github.com/tidwall/gjson"
@@ -123,6 +124,17 @@ func Map(err error) (codeErr CodeError) {
 		return
 	}
 	codeErr = NewWithDepth(serviceErrorCode, serviceErrorName, err.Error(), 3)
+	return
+}
+
+func Decode(p []byte) (err CodeError) {
+	v := &codeError{}
+	decodeErr := json.Unmarshal(p, v)
+	if decodeErr != nil {
+		err = Warning("decode code error failed").WithCause(decodeErr)
+		return
+	}
+	err = v
 	return
 }
 

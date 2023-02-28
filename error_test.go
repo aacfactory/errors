@@ -1,6 +1,7 @@
 package errors_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/aacfactory/errors"
@@ -46,6 +47,10 @@ func Test_Json(t *testing.T) {
 	err = err.WithCause(fmt.Errorf("bar")).WithCause(fmt.Errorf("baz"))
 	data, _ := json.Marshal(err)
 	fmt.Println(string(data))
+	err1 := errors.Decode(data)
+	fmt.Println(fmt.Sprintf("%+v", err1))
+	data1, _ := json.Marshal(err1)
+	fmt.Println(bytes.Equal(data, data1))
 }
 
 func TestMakeErrors(t *testing.T) {
