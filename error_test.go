@@ -12,7 +12,6 @@ import (
 func TestNew(t *testing.T) {
 	err := errors.ServiceError("foo").WithCause(errors.ServiceError("bar").WithCause(errors.ServiceError("baz")))
 	fmt.Printf("%v\n", err)
-	fmt.Println(err.String())
 	fmt.Printf("%+v\n", err)
 }
 

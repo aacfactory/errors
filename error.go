@@ -275,26 +275,7 @@ func (e *codeError) Format(state fmt.State, verb rune) {
 		case state.Flag('+'):
 			buf := bytebufferpool.Get()
 			_, _ = buf.WriteString("\n>>>>>>>>>>>>>\n")
-			if e.Id() != "" {
-				_, _ = buf.WriteString(fmt.Sprintf("ID      = [%s]\n", e.Id()))
-			}
-			_, _ = buf.WriteString(fmt.Sprintf("CN      = [%d][%s]\n", e.Code(), e.Name()))
-			_, _ = buf.WriteString(fmt.Sprintf("MESSAGE = %s\n", e.Message()))
-			if len(e.Meta_) > 0 {
-				_, _ = buf.WriteString("META    = ")
-				metaIdx := 0
-				for k, v := range e.Meta_ {
-					if metaIdx == 0 {
-						_, _ = buf.WriteString(fmt.Sprintf("%s : %v\n", k, v))
-					} else {
-						_, _ = buf.WriteString(fmt.Sprintf("          %s : %v\n", k, v))
-					}
-					metaIdx++
-				}
-			}
-			fn, file, line := e.Stacktrace()
-			_, _ = buf.WriteString(fmt.Sprintf("STACK   = %s %s:%d\n", fn, file, line))
-			formatCause(buf, e.Cause_, 0)
+			format(buf, e)
 			_, _ = buf.WriteString("<<<<<<<<<<<<<\n")
 			content := buf.Bytes()[:buf.Len()-1]
 			bytebufferpool.Put(buf)
@@ -304,6 +285,33 @@ func (e *codeError) Format(state fmt.State, verb rune) {
 		}
 	default:
 		_, _ = fmt.Fprintf(state, "%s", e.Message())
+	}
+}
+
+func format(buf *bytebufferpool.ByteBuffer, err CodeError) {
+	e := err.(*codeError)
+	if e.Id() != "" {
+		_, _ = buf.WriteString(fmt.Sprintf("ID      = [%s]\n", e.Id()))
+	}
+	_, _ = buf.WriteString(fmt.Sprintf("CN      = [%d][%s]\n", e.Code(), e.Name()))
+	_, _ = buf.WriteString(fmt.Sprintf("MESSAGE = %s\n", e.Message()))
+	if len(e.Meta_) > 0 {
+		_, _ = buf.WriteString("META    = ")
+		metaIdx := 0
+		for k, v := range e.Meta_ {
+			if metaIdx == 0 {
+				_, _ = buf.WriteString(fmt.Sprintf("%s : %v\n", k, v))
+			} else {
+				_, _ = buf.WriteString(fmt.Sprintf("          %s : %v\n", k, v))
+			}
+			metaIdx++
+		}
+	}
+	fn, file, line := e.Stacktrace()
+	_, _ = buf.WriteString(fmt.Sprintf("STACK   = %s %s:%d\n", fn, file, line))
+	if e.Cause_ != nil {
+		_, _ = buf.WriteString("---\n")
+		format(buf, e.Cause_)
 	}
 }
 
