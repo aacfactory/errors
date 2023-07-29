@@ -384,3 +384,8 @@ func (e *Errors) Error() (err error) {
 	err = e0
 	return
 }
+
+func Contains(a error, b error) (has bool) {
+	has = Map(a).Contains(b)
+	return
+}
