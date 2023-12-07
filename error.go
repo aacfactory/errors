@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"github.com/rs/xid"
 	"github.com/valyala/bytebufferpool"
-	"runtime"
-	"strings"
 )
 
 const (
@@ -50,6 +48,7 @@ type CodeError interface {
 	Error() string
 	Format(state fmt.State, r rune)
 	String() string
+	json.Marshaler
 }
 
 func Empty() CodeError {
@@ -120,7 +119,7 @@ func NewWithDepth(code int, name string, message string, skip int) CodeError {
 		Code_:       code,
 		Name_:       name,
 		Message_:    message,
-		Meta_:       make(map[string]string),
+		Meta_:       nil,
 		Stacktrace_: stacktrace_,
 		Cause_:      nil,
 	}
@@ -151,20 +150,14 @@ func Decode(p []byte) (err CodeError) {
 	return
 }
 
-type stacktrace struct {
-	Fn   string `json:"fn"`
-	File string `json:"file"`
-	Line int    `json:"line"`
-}
-
 type codeError struct {
-	Id_         string            `json:"id,omitempty"`
-	Code_       int               `json:"code,omitempty"`
-	Name_       string            `json:"name,omitempty"`
-	Message_    string            `json:"message,omitempty"`
-	Meta_       map[string]string `json:"meta,omitempty"`
-	Stacktrace_ stacktrace        `json:"stacktrace,omitempty"`
-	Cause_      *codeError        `json:"cause,omitempty"`
+	Id_         string     `json:"id,omitempty"`
+	Code_       int        `json:"code,omitempty"`
+	Name_       string     `json:"name,omitempty"`
+	Message_    string     `json:"message,omitempty"`
+	Meta_       meta       `json:"meta,omitempty"`
+	Stacktrace_ stacktrace `json:"stacktrace,omitempty"`
+	Cause_      *codeError `json:"cause,omitempty"`
 }
 
 func (e *codeError) Id() string {
@@ -191,7 +184,7 @@ func (e *codeError) Stacktrace() (fn string, file string, line int) {
 }
 
 func (e *codeError) WithMeta(key string, value string) (err CodeError) {
-	e.Meta_[key] = value
+	e.Meta_ = e.Meta_.Add(key, value)
 	err = e
 	return
 }
@@ -272,79 +265,6 @@ func (e *codeError) Format(state fmt.State, verb rune) {
 		}
 	default:
 		_, _ = fmt.Fprintf(state, "%s", e.Message())
-	}
-}
-
-func format(buf *bytebufferpool.ByteBuffer, err CodeError) {
-	e := err.(*codeError)
-	if e.Id() != "" {
-		_, _ = buf.WriteString(fmt.Sprintf("ID      = [%s]\n", e.Id()))
-	}
-	_, _ = buf.WriteString(fmt.Sprintf("CN      = [%d][%s]\n", e.Code(), e.Name()))
-	_, _ = buf.WriteString(fmt.Sprintf("MESSAGE = %s\n", e.Message()))
-	if len(e.Meta_) > 0 {
-		_, _ = buf.WriteString("META    = ")
-		metaIdx := 0
-		for k, v := range e.Meta_ {
-			if metaIdx == 0 {
-				_, _ = buf.WriteString(fmt.Sprintf("%s : %v\n", k, v))
-			} else {
-				_, _ = buf.WriteString(fmt.Sprintf("          %s : %v\n", k, v))
-			}
-			metaIdx++
-		}
-	}
-	fn, file, line := e.Stacktrace()
-	_, _ = buf.WriteString(fmt.Sprintf("STACK   = %s %s:%d\n", fn, file, line))
-	if e.Cause_ != nil {
-		_, _ = buf.WriteString("---\n")
-		format(buf, e.Cause_)
-	}
-}
-
-func formatCause(buf *bytebufferpool.ByteBuffer, cause CodeError, depth int) {
-	if cause == nil {
-		return
-	}
-	if depth == 0 {
-		_, _ = buf.WriteString(fmt.Sprintf("CAUSE   = %s\n", cause.Message()))
-	} else {
-		_, _ = buf.WriteString(fmt.Sprintf("        = %s\n", cause.Message()))
-	}
-	e, ok := cause.(*codeError)
-	if !ok {
-		return
-	}
-	if e.Cause_ != nil {
-		formatCause(buf, e.Cause_, depth+1)
-	}
-}
-
-func newStacktrace(skip int) stacktrace {
-	pc, file, line, ok := runtime.Caller(skip)
-	if !ok {
-		return stacktrace{
-			Fn:   "unknown",
-			File: "unknown",
-			Line: 0,
-		}
-	}
-	if strings.IndexByte(file, '/') == 0 || strings.IndexByte(file, ':') == 1 {
-		idx := strings.Index(file, "/src/")
-		if idx > 0 {
-			file = file[idx+5:]
-		} else {
-			idx = strings.Index(file, "/pkg/mod/")
-			if idx > 0 {
-				file = file[idx+9:]
-			}
-		}
-	}
-	fn := runtime.FuncForPC(pc)
-	return stacktrace{
-		Fn:   fn.Name(),
-		File: file,
-		Line: line,
 	}
 }
 
