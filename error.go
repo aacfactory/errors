@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rs/xid"
-	"github.com/tidwall/gjson"
 	"github.com/valyala/bytebufferpool"
 	"runtime"
 	"strings"
@@ -165,7 +164,7 @@ type codeError struct {
 	Message_    string            `json:"message,omitempty"`
 	Meta_       map[string]string `json:"meta,omitempty"`
 	Stacktrace_ stacktrace        `json:"stacktrace,omitempty"`
-	Cause_      CodeError         `json:"cause,omitempty"`
+	Cause_      *codeError        `json:"cause,omitempty"`
 }
 
 func (e *codeError) Id() string {
@@ -218,7 +217,7 @@ func (e *codeError) WithCause(cause error) (err CodeError) {
 		}
 	}
 	if e.Cause_ == nil {
-		e.Cause_ = ce
+		e.Cause_ = ce.(*codeError)
 	} else {
 		_ = e.Cause_.WithCause(ce)
 	}
@@ -254,50 +253,6 @@ func (e *codeError) Error() string {
 
 func (e *codeError) String() string {
 	return fmt.Sprintf("%+v", e)
-}
-
-func (e *codeError) UnmarshalJSON(p []byte) (err error) {
-	if p == nil || len(p) == 0 {
-		return
-	}
-	r := gjson.ParseBytes(p)
-	if !r.Exists() {
-		return
-	}
-
-	e.Id_ = r.Get("id").String()
-	e.Code_ = int(r.Get("code").Int())
-	e.Name_ = r.Get("name").String()
-	e.Message_ = r.Get("message").String()
-	meta0 := r.Get("meta")
-	if meta0.Exists() {
-		if e.Meta_ == nil {
-			e.Meta_ = make(map[string]string)
-		}
-		metaValue0 := meta0.Map()
-		for key, result := range metaValue0 {
-			if result.Exists() {
-				e.Meta_[key] = result.String()
-			}
-		}
-	}
-	st0 := r.Get("stacktrace")
-	if st0.Exists() && st0.IsObject() {
-		e.Stacktrace_.File = st0.Get("file").String()
-		e.Stacktrace_.Line = int(st0.Get("line").Int())
-		e.Stacktrace_.Fn = st0.Get("fn").String()
-	}
-
-	cause0 := r.Get("cause")
-	if cause0.Exists() && cause0.IsObject() {
-		cause := &codeError{}
-		causeErr := cause.UnmarshalJSON([]byte(cause0.Raw))
-		if causeErr == nil {
-			e.Cause_ = cause
-		}
-	}
-
-	return
 }
 
 func (e *codeError) Format(state fmt.State, verb rune) {
