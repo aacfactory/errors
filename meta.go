@@ -3,6 +3,7 @@ package errors
 import (
 	"github.com/valyala/bytebufferpool"
 	"sort"
+	"unsafe"
 )
 
 type Pair struct {
@@ -29,7 +30,8 @@ func (pair Pair) MarshalJSON() (p []byte, err error) {
 	_, _ = buf.WriteString(pair.Value)
 	_, _ = buf.Write(dqm)
 	_, _ = buf.Write(rb)
-	p = buf.Bytes()
+	s := buf.String()
+	p = unsafe.Slice(unsafe.StringData(s), len(s))
 	bytebufferpool.Put(buf)
 	return
 }
@@ -81,7 +83,8 @@ func (m meta) MarshalJSON() (p []byte, err error) {
 		_, _ = buf.Write(b)
 	}
 	_, _ = buf.Write(rqb)
-	p = buf.Bytes()
+	s := buf.String()
+	p = unsafe.Slice(unsafe.StringData(s), len(s))
 	bytebufferpool.Put(buf)
 	return
 }

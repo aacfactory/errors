@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"unsafe"
 )
 
 func newStacktrace(skip int) stacktrace {
@@ -69,7 +70,8 @@ func (s stacktrace) MarshalJSON() (p []byte, err error) {
 	_, _ = buf.Write(colon)
 	_, _ = buf.WriteString(strconv.Itoa(s.Line))
 	_, _ = buf.Write(rb)
-	p = buf.Bytes()
+	ss := buf.String()
+	p = unsafe.Slice(unsafe.StringData(ss), len(ss))
 	bytebufferpool.Put(buf)
 	return
 }

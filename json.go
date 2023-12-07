@@ -3,6 +3,7 @@ package errors
 import (
 	"github.com/valyala/bytebufferpool"
 	"strconv"
+	"unsafe"
 )
 
 var (
@@ -90,7 +91,8 @@ func (e codeError) MarshalJSON() (p []byte, err error) {
 		_, _ = buf.Write(causeBytes)
 	}
 	_, _ = buf.Write(rb)
-	p = buf.Bytes()
+	s := buf.String()
+	p = unsafe.Slice(unsafe.StringData(s), len(s))
 	bytebufferpool.Put(buf)
 	return
 }
