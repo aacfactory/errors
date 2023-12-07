@@ -113,19 +113,18 @@ func New(code int, name string, message string) CodeError {
 }
 
 func NewWithDepth(code int, name string, message string, skip int) CodeError {
-	stacktrace_ := newStacktrace(skip)
-	return &codeError{
+	return codeError{
 		Id_:         xid.New().String(),
 		Code_:       code,
 		Name_:       name,
 		Message_:    message,
 		Meta_:       nil,
-		Stacktrace_: stacktrace_,
+		Stacktrace_: newStacktrace(skip),
 		Cause_:      nil,
 	}
 }
 
-func Map(err error) (codeErr CodeError) {
+func Wrap(err error) (codeErr CodeError) {
 	if err == nil {
 		codeErr = NewWithDepth(serviceErrorCode, serviceErrorName, "can not map nil to CodeError", 3)
 		return
@@ -140,8 +139,8 @@ func Map(err error) (codeErr CodeError) {
 }
 
 func Decode(p []byte) (err CodeError) {
-	v := &codeError{}
-	decodeErr := json.Unmarshal(p, v)
+	v := codeError{}
+	decodeErr := json.Unmarshal(p, &v)
 	if decodeErr != nil {
 		err = Warning("decode code error failed").WithCause(decodeErr)
 		return
@@ -160,36 +159,36 @@ type codeError struct {
 	Cause_      *codeError `json:"cause,omitempty"`
 }
 
-func (e *codeError) Id() string {
+func (e codeError) Id() string {
 	return e.Id_
 }
 
-func (e *codeError) Code() int {
+func (e codeError) Code() int {
 	return e.Code_
 }
 
-func (e *codeError) Name() string {
+func (e codeError) Name() string {
 	return e.Name_
 }
 
-func (e *codeError) Message() string {
+func (e codeError) Message() string {
 	return e.Message_
 }
 
-func (e *codeError) Stacktrace() (fn string, file string, line int) {
+func (e codeError) Stacktrace() (fn string, file string, line int) {
 	fn = e.Stacktrace_.Fn
 	file = e.Stacktrace_.File
 	line = e.Stacktrace_.Line
 	return
 }
 
-func (e *codeError) WithMeta(key string, value string) (err CodeError) {
+func (e codeError) WithMeta(key string, value string) (err CodeError) {
 	e.Meta_ = e.Meta_.Add(key, value)
 	err = e
 	return
 }
 
-func (e *codeError) WithCause(cause error) (err CodeError) {
+func (e codeError) WithCause(cause error) (err CodeError) {
 	if cause == nil {
 		err = e
 		return
@@ -210,15 +209,18 @@ func (e *codeError) WithCause(cause error) (err CodeError) {
 		}
 	}
 	if e.Cause_ == nil {
-		e.Cause_ = ce.(*codeError)
+		ca := ce.(codeError)
+		e.Cause_ = &ca
 	} else {
-		_ = e.Cause_.WithCause(ce)
+		ce = e.Cause_.WithCause(ce)
+		ca := ce.(codeError)
+		e.Cause_ = &ca
 	}
 	err = e
 	return
 }
 
-func (e *codeError) Contains(err error) (has bool) {
+func (e codeError) Contains(err error) (has bool) {
 	if err == nil {
 		return
 	}
@@ -240,15 +242,15 @@ func (e *codeError) Contains(err error) (has bool) {
 	return
 }
 
-func (e *codeError) Error() string {
+func (e codeError) Error() string {
 	return e.String()
 }
 
-func (e *codeError) String() string {
+func (e codeError) String() string {
 	return fmt.Sprintf("%+v", e)
 }
 
-func (e *codeError) Format(state fmt.State, verb rune) {
+func (e codeError) Format(state fmt.State, verb rune) {
 	switch verb {
 	case 'v':
 		switch {
@@ -275,7 +277,7 @@ func MakeErrors() Errors {
 type Errors []CodeError
 
 func (e *Errors) Append(err error) {
-	*e = append(*e, Map(err))
+	*e = append(*e, Wrap(err))
 }
 
 func (e *Errors) Error() (err error) {

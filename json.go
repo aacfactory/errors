@@ -27,7 +27,7 @@ var (
 	causeIdent      = []byte("cause")
 )
 
-func (e *codeError) MarshalJSON() (p []byte, err error) {
+func (e codeError) MarshalJSON() (p []byte, err error) {
 	buf := bytebufferpool.Get()
 	_, _ = buf.Write(lb)
 	// id

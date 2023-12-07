@@ -6,7 +6,7 @@ import (
 )
 
 func format(buf *bytebufferpool.ByteBuffer, err CodeError) {
-	e := err.(*codeError)
+	e := err.(codeError)
 	if e.Id() != "" {
 		_, _ = buf.WriteString(fmt.Sprintf("ID      = [%s]\n", e.Id()))
 	}
@@ -28,6 +28,6 @@ func format(buf *bytebufferpool.ByteBuffer, err CodeError) {
 	_, _ = buf.WriteString(fmt.Sprintf("STACK   = %s %s:%d\n", fn, file, line))
 	if e.Cause_ != nil {
 		_, _ = buf.WriteString("---\n")
-		format(buf, e.Cause_)
+		format(buf, *e.Cause_)
 	}
 }

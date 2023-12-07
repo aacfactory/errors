@@ -16,9 +16,9 @@ func TestNew(t *testing.T) {
 	fmt.Printf("%+v\n", err)
 }
 
-func TestMap(t *testing.T) {
+func TestWrap(t *testing.T) {
 	cause := fmt.Errorf("foo")
-	err := errors.Map(cause)
+	err := errors.Wrap(cause)
 	fmt.Printf("%v\n", err)
 	fmt.Printf("%+v\n", err)
 }
