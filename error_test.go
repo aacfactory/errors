@@ -3,6 +3,7 @@ package errors_test
 import (
 	"bytes"
 	"encoding/json"
+	serrors "errors"
 	"fmt"
 	"github.com/aacfactory/errors"
 	"testing"
@@ -58,4 +59,18 @@ func TestMakeErrors(t *testing.T) {
 		errs.Append(errors.ServiceError(fmt.Sprintf("%d", i)))
 	}
 	fmt.Println(fmt.Sprintf("%+v", errs.Error()))
+}
+
+func TestContains(t *testing.T) {
+	c1 := errors.Warning("c1")
+	c2 := errors.Warning("c2").WithCause(c1)
+	fmt.Println(errors.Contains(c1, c2), errors.Contains(c2, c1))
+	c3 := fmt.Errorf("c3")
+	c4 := fmt.Errorf("c4")
+	c5 := serrors.Join(c3, c4)
+	c6 := errors.Warning("c6").WithCause(c5)
+	fmt.Println(errors.Contains(c3, c4))
+	fmt.Println(errors.Contains(c5, c3), errors.Contains(c5, c4))
+	fmt.Println(errors.Contains(c6, c3))
+	fmt.Println(c6.String())
 }

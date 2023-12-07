@@ -2,6 +2,7 @@ package errors
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/rs/xid"
 	"github.com/tidwall/gjson"
@@ -23,6 +24,10 @@ const (
 	notAcceptableErrorName         = "***NOT ACCEPTABLE***"
 	timeoutErrorCode               = 408
 	timeoutErrorName               = "***TIMEOUT***"
+	tooEarlyCode                   = 425
+	tooEarlyName                   = "***TOO EARLY***"
+	tooManyRequestsCode            = 429
+	tooManyRequestsName            = "***TOO MANY REQUEST***"
 	serviceErrorCode               = 500
 	serviceErrorName               = "***SERVICE EXECUTE FAILED***"
 	nilErrorMessage                = "NIL"
@@ -53,6 +58,7 @@ func Empty() CodeError {
 }
 
 func BadRequest(message string) CodeError {
+
 	return NewWithDepth(badRequestErrorCode, badRequestErrorName, message, 3)
 }
 
@@ -90,6 +96,14 @@ func NotImplemented(message string) CodeError {
 
 func Unavailable(message string) CodeError {
 	return NewWithDepth(unavailableErrorCode, unavailableErrorName, message, 3)
+}
+
+func TooMayRequest(message string) CodeError {
+	return NewWithDepth(tooManyRequestsCode, tooManyRequestsName, message, 3)
+}
+
+func TooEarly(message string) CodeError {
+	return NewWithDepth(tooEarlyCode, tooEarlyName, message, 3)
 }
 
 func Warning(message string) CodeError {
@@ -190,7 +204,18 @@ func (e *codeError) WithCause(cause error) (err CodeError) {
 	}
 	ce, ok := cause.(CodeError)
 	if !ok {
-		ce = NewWithDepth(serviceErrorCode, serviceErrorName, cause.Error(), 4)
+		joined, isJoined := cause.(JoinedErrors)
+		if isJoined {
+			errs := joined.Unwrap()
+			if len(errs) > 0 {
+				ce = NewWithDepth(serviceErrorCode, serviceErrorName, errs[0].Error(), 4)
+				for _, sub := range errs[1:] {
+					ce = ce.WithCause(sub)
+				}
+			}
+		} else {
+			ce = NewWithDepth(serviceErrorCode, serviceErrorName, cause.Error(), 4)
+		}
 	}
 	if e.Cause_ == nil {
 		e.Cause_ = ce
@@ -205,13 +230,20 @@ func (e *codeError) Contains(err error) (has bool) {
 	if err == nil {
 		return
 	}
-	if e.Message() == err.Error() {
-		has = true
-		return
+	codeErr, ok := err.(CodeError)
+	if ok {
+		if e.Message() == codeErr.Message() {
+			has = true
+		}
+	} else {
+		if e.Message() == err.Error() {
+			has = true
+		} else {
+			has = errors.Is(e, err)
+		}
 	}
-	if e.Cause_ != nil {
+	if !has && e.Cause_ != nil {
 		has = e.Cause_.Contains(err)
-		return
 	}
 	return
 }
@@ -386,6 +418,29 @@ func (e *Errors) Error() (err error) {
 }
 
 func Contains(a error, b error) (has bool) {
-	has = Map(a).Contains(b)
+	if a == nil {
+		return
+	}
+	if b == nil {
+		return
+	}
+	codeErrorA, aOk := a.(CodeError)
+	if aOk {
+		has = codeErrorA.Contains(b)
+		return
+	}
+	has = errors.Is(a, b)
 	return
+}
+
+func As(err error) (e CodeError, ok bool) {
+	if err == nil {
+		return
+	}
+	e, ok = err.(CodeError)
+	return
+}
+
+type JoinedErrors interface {
+	Unwrap() []error
 }
