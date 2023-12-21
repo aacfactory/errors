@@ -154,8 +154,8 @@ type CodeErrorImpl struct {
 	Code_       int            `json:"code,omitempty" avro:"code"`
 	Name_       string         `json:"name,omitempty" avro:"name"`
 	Message_    string         `json:"message,omitempty" avro:"message"`
-	Meta_       Meta           `json:"Meta,omitempty" avro:"Meta"`
-	Stacktrace_ Stacktrace     `json:"Stacktrace,omitempty" avro:"Stacktrace"`
+	Meta_       Meta           `json:"meta,omitempty" avro:"meta"`
+	Stacktrace_ Stacktrace     `json:"stacktrace,omitempty" avro:"stacktrace"`
 	Cause_      *CodeErrorImpl `json:"cause,omitempty" avro:"cause"`
 }
 
