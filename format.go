@@ -6,7 +6,7 @@ import (
 )
 
 func format(buf *bytebufferpool.ByteBuffer, err CodeError) {
-	e := err.(codeError)
+	e := err.(CodeErrorImpl)
 	if e.Id() != "" {
 		_, _ = buf.WriteString(fmt.Sprintf("ID      = [%s]\n", e.Id()))
 	}

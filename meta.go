@@ -7,8 +7,8 @@ import (
 )
 
 type Pair struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Key   string `json:"key" avro:"key"`
+	Value string `json:"value" avro:"value"`
 }
 
 func (pair Pair) MarshalJSON() (p []byte, err error) {
@@ -36,21 +36,21 @@ func (pair Pair) MarshalJSON() (p []byte, err error) {
 	return
 }
 
-type meta []Pair
+type Meta []Pair
 
-func (m meta) Len() int {
+func (m Meta) Len() int {
 	return len(m)
 }
 
-func (m meta) Less(i, j int) bool {
+func (m Meta) Less(i, j int) bool {
 	return m[i].Key < m[j].Key
 }
 
-func (m meta) Swap(i, j int) {
+func (m Meta) Swap(i, j int) {
 	m[i], m[j] = m[j], m[i]
 }
 
-func (m meta) Add(key string, value string) meta {
+func (m Meta) Add(key string, value string) Meta {
 	for i, pair := range m {
 		if pair.Key == key {
 			pair.Value = value
@@ -66,7 +66,7 @@ func (m meta) Add(key string, value string) meta {
 	return n
 }
 
-func (m meta) MarshalJSON() (p []byte, err error) {
+func (m Meta) MarshalJSON() (p []byte, err error) {
 	buf := bytebufferpool.Get()
 	_, _ = buf.Write(lqb)
 	if m.Len() == 0 {

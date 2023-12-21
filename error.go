@@ -52,7 +52,7 @@ type CodeError interface {
 }
 
 func Empty() CodeError {
-	return &codeError{}
+	return &CodeErrorImpl{}
 }
 
 func BadRequest(message string) CodeError {
@@ -113,7 +113,7 @@ func New(code int, name string, message string) CodeError {
 }
 
 func NewWithDepth(code int, name string, message string, skip int) CodeError {
-	return codeError{
+	return CodeErrorImpl{
 		Id_:         xid.New().String(),
 		Code_:       code,
 		Name_:       name,
@@ -139,7 +139,7 @@ func Wrap(err error) (codeErr CodeError) {
 }
 
 func Decode(p []byte) (err CodeError) {
-	v := codeError{}
+	v := CodeErrorImpl{}
 	decodeErr := json.Unmarshal(p, &v)
 	if decodeErr != nil {
 		err = Warning("decode code error failed").WithCause(decodeErr)
@@ -149,46 +149,46 @@ func Decode(p []byte) (err CodeError) {
 	return
 }
 
-type codeError struct {
-	Id_         string     `json:"id,omitempty"`
-	Code_       int        `json:"code,omitempty"`
-	Name_       string     `json:"name,omitempty"`
-	Message_    string     `json:"message,omitempty"`
-	Meta_       meta       `json:"meta,omitempty"`
-	Stacktrace_ stacktrace `json:"stacktrace,omitempty"`
-	Cause_      *codeError `json:"cause,omitempty"`
+type CodeErrorImpl struct {
+	Id_         string         `json:"id,omitempty" avro:"id"`
+	Code_       int            `json:"code,omitempty" avro:"code"`
+	Name_       string         `json:"name,omitempty" avro:"name"`
+	Message_    string         `json:"message,omitempty" avro:"message"`
+	Meta_       Meta           `json:"Meta,omitempty" avro:"Meta"`
+	Stacktrace_ Stacktrace     `json:"Stacktrace,omitempty" avro:"Stacktrace"`
+	Cause_      *CodeErrorImpl `json:"cause,omitempty" avro:"cause"`
 }
 
-func (e codeError) Id() string {
+func (e CodeErrorImpl) Id() string {
 	return e.Id_
 }
 
-func (e codeError) Code() int {
+func (e CodeErrorImpl) Code() int {
 	return e.Code_
 }
 
-func (e codeError) Name() string {
+func (e CodeErrorImpl) Name() string {
 	return e.Name_
 }
 
-func (e codeError) Message() string {
+func (e CodeErrorImpl) Message() string {
 	return e.Message_
 }
 
-func (e codeError) Stacktrace() (fn string, file string, line int) {
+func (e CodeErrorImpl) Stacktrace() (fn string, file string, line int) {
 	fn = e.Stacktrace_.Fn
 	file = e.Stacktrace_.File
 	line = e.Stacktrace_.Line
 	return
 }
 
-func (e codeError) WithMeta(key string, value string) (err CodeError) {
+func (e CodeErrorImpl) WithMeta(key string, value string) (err CodeError) {
 	e.Meta_ = e.Meta_.Add(key, value)
 	err = e
 	return
 }
 
-func (e codeError) WithCause(cause error) (err CodeError) {
+func (e CodeErrorImpl) WithCause(cause error) (err CodeError) {
 	if cause == nil {
 		err = e
 		return
@@ -209,18 +209,18 @@ func (e codeError) WithCause(cause error) (err CodeError) {
 		}
 	}
 	if e.Cause_ == nil {
-		ca := ce.(codeError)
+		ca := ce.(CodeErrorImpl)
 		e.Cause_ = &ca
 	} else {
 		ce = e.Cause_.WithCause(ce)
-		ca := ce.(codeError)
+		ca := ce.(CodeErrorImpl)
 		e.Cause_ = &ca
 	}
 	err = e
 	return
 }
 
-func (e codeError) Contains(err error) (has bool) {
+func (e CodeErrorImpl) Contains(err error) (has bool) {
 	if err == nil {
 		return
 	}
@@ -242,15 +242,15 @@ func (e codeError) Contains(err error) (has bool) {
 	return
 }
 
-func (e codeError) Error() string {
+func (e CodeErrorImpl) Error() string {
 	return e.String()
 }
 
-func (e codeError) String() string {
+func (e CodeErrorImpl) String() string {
 	return fmt.Sprintf("%+v", e)
 }
 
-func (e codeError) Format(state fmt.State, verb rune) {
+func (e CodeErrorImpl) Format(state fmt.State, verb rune) {
 	switch verb {
 	case 'v':
 		switch {

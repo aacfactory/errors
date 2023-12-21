@@ -8,10 +8,10 @@ import (
 	"unsafe"
 )
 
-func newStacktrace(skip int) stacktrace {
+func newStacktrace(skip int) Stacktrace {
 	pc, file, line, ok := runtime.Caller(skip)
 	if !ok {
-		return stacktrace{
+		return Stacktrace{
 			Fn:   "unknown",
 			File: "unknown",
 			Line: 0,
@@ -29,20 +29,20 @@ func newStacktrace(skip int) stacktrace {
 		}
 	}
 	fn := runtime.FuncForPC(pc)
-	return stacktrace{
+	return Stacktrace{
 		Fn:   fn.Name(),
 		File: file,
 		Line: line,
 	}
 }
 
-type stacktrace struct {
-	Fn   string `json:"fn"`
-	File string `json:"file"`
-	Line int    `json:"line"`
+type Stacktrace struct {
+	Fn   string `json:"fn" avro:"fn"`
+	File string `json:"file" avro:"file"`
+	Line int    `json:"line" avro:"line"`
 }
 
-func (s stacktrace) MarshalJSON() (p []byte, err error) {
+func (s Stacktrace) MarshalJSON() (p []byte, err error) {
 	buf := bytebufferpool.Get()
 	_, _ = buf.Write(lb)
 	// fn

@@ -18,17 +18,17 @@ var (
 	codeIdent       = []byte("code")
 	nameIdent       = []byte("name")
 	messageIdent    = []byte("message")
-	metaIdent       = []byte("meta")
+	metaIdent       = []byte("Meta")
 	keyIdent        = []byte("key")
 	valueIdent      = []byte("value")
-	stacktraceIdent = []byte("stacktrace")
+	stacktraceIdent = []byte("Stacktrace")
 	fnIdent         = []byte("fn")
 	fileIdent       = []byte("file")
 	lineIdent       = []byte("line")
 	causeIdent      = []byte("cause")
 )
 
-func (e codeError) MarshalJSON() (p []byte, err error) {
+func (e CodeErrorImpl) MarshalJSON() (p []byte, err error) {
 	buf := bytebufferpool.Get()
 	_, _ = buf.Write(lb)
 	// id
@@ -65,7 +65,7 @@ func (e codeError) MarshalJSON() (p []byte, err error) {
 	_, _ = buf.WriteString(e.Message_)
 	_, _ = buf.Write(dqm)
 	_, _ = buf.Write(comma)
-	// meta
+	// Meta
 	_, _ = buf.Write(dqm)
 	_, _ = buf.Write(metaIdent)
 	_, _ = buf.Write(dqm)
@@ -73,7 +73,7 @@ func (e codeError) MarshalJSON() (p []byte, err error) {
 	metaBytes, _ := e.Meta_.MarshalJSON()
 	_, _ = buf.Write(metaBytes)
 	_, _ = buf.Write(comma)
-	// stacktrace
+	// Stacktrace
 	_, _ = buf.Write(dqm)
 	_, _ = buf.Write(stacktraceIdent)
 	_, _ = buf.Write(dqm)
